@@ -15,17 +15,40 @@ export const BannerAd: React.FC<BannerAdProps> = ({
 
   return (
     <div
-      className={`w-full overflow-hidden bg-slate-50 border-t border-b border-slate-200 text-center py-2 transition-all ${
-        position === "bottom" ? "sticky bottom-0 z-30 shadow-md bg-white/95 backdrop-blur" : ""
-      }`}
+      style={{
+        width: "100%",
+        overflow: "hidden",
+        backgroundColor: "#ffffff",
+        borderTop: "1px solid #f1f5f9",
+        padding: "8px 12px",
+        textAlign: "center",
+        boxSizing: "border-box",
+        ...(position === "bottom"
+          ? {
+              position: "sticky",
+              bottom: 0,
+              zIndex: 30,
+              boxShadow: "0 -2px 10px rgba(0,0,0,0.05)",
+            }
+          : {}),
+      }}
     >
-      <div className="text-[10px] text-slate-400 font-medium mb-1 tracking-wider uppercase">
-        Advertisement
+      <div
+        style={{
+          fontSize: "9px",
+          color: "#94a3b8",
+          fontWeight: 700,
+          marginBottom: "4px",
+          letterSpacing: "0.05em",
+          textTransform: "uppercase",
+        }}
+      >
+        Sponsor Advertisement
       </div>
+
       {adClient ? (
-        // 실제 Google AdSense 배너 슬롯
         <ins
-          className="adsbygoogle block"
+          className="adsbygoogle"
           style={{ display: "block", minHeight: "50px" }}
           data-ad-client={adClient}
           data-ad-slot={slotId}
@@ -33,25 +56,58 @@ export const BannerAd: React.FC<BannerAdProps> = ({
           data-full-width-responsive="true"
         />
       ) : (
-        // 테스트/시뮬레이션용 배너 (쿠팡 와우 멤버십 및 토스 혜택 홍보)
-        <div className="flex items-center justify-between px-4 py-2 mx-3 rounded-lg bg-gradient-to-r from-red-500/10 via-amber-500/10 to-blue-500/10 border border-slate-200">
-          <div className="flex items-center space-x-2">
-            <span className="px-1.5 py-0.5 rounded bg-red-600 text-white text-[11px] font-bold">
+        <a
+          href="https://www.coupang.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "8px 12px",
+            background: "linear-gradient(135deg, #fff1f2 0%, #fef2f2 100%)",
+            border: "1px solid #fecdd3",
+            borderRadius: "10px",
+            textDecoration: "none",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span
+              style={{
+                backgroundColor: "#e11d48",
+                color: "#ffffff",
+                fontSize: "10px",
+                fontWeight: 800,
+                padding: "2px 6px",
+                borderRadius: "4px",
+              }}
+            >
               쿠팡 WOW
             </span>
-            <span className="text-xs font-semibold text-slate-700 text-left">
-              지금 가입하면 첫 달 무료 & 무제한 무료 로켓배송
+            <span
+              style={{
+                fontSize: "11px",
+                fontWeight: 600,
+                color: "#1e293b",
+                textAlign: "left",
+                lineHeight: 1.3,
+              }}
+            >
+              지금 첫 달 무료 ➔ 로켓배송 무제한 무료
             </span>
           </div>
-          <a
-            href="https://www.coupang.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[11px] font-bold text-red-600 hover:underline whitespace-nowrap ml-2"
+          <span
+            style={{
+              fontSize: "11px",
+              fontWeight: 800,
+              color: "#e11d48",
+              whiteSpace: "nowrap",
+              marginLeft: "8px",
+            }}
           >
             보기 ➔
-          </a>
-        </div>
+          </span>
+        </a>
       )}
     </div>
   );

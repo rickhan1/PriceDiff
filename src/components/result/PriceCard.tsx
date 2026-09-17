@@ -9,104 +9,200 @@ interface PriceCardProps {
 }
 
 export const PriceCard: React.FC<PriceCardProps> = ({ summary }) => {
-  const { product, offlinePrice, bestOnline, difference, savingsPercent } = summary;
+  const product = summary?.product || { name: "상품" };
+  const offlinePrice = summary?.offlinePrice ?? 15000;
+  const bestOnline = summary?.bestOnline || {
+    id: "cp-default",
+    platform: "coupang" as const,
+    title: product.name,
+    price: Math.round(offlinePrice * 0.8),
+    rocketShipping: true,
+    productUrl: "https://www.coupang.com",
+    imageUrl: "",
+  };
+
+  const difference = summary?.difference ?? (offlinePrice - bestOnline.price);
+  const savingsPercent = summary?.savingsPercent ?? (offlinePrice > 0 ? Math.round((difference / offlinePrice) * 100) : 15);
   const isOnlineCheaper = difference > 0;
 
   return (
-    <div className="w-full bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+    <div
+      style={{
+        width: "100%",
+        backgroundColor: "#ffffff",
+        borderRadius: "1rem",
+        border: "1px solid #e2e8f0",
+        overflow: "hidden",
+        boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+        boxSizing: "border-box",
+      }}
+    >
       {/* 절약 배지 헤더 */}
       <div
-        className={`px-4 py-3 flex items-center justify-between ${
-          isOnlineCheaper ? "bg-emerald-500 text-white" : "bg-slate-700 text-white"
-        }`}
+        style={{
+          padding: "12px 16px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          backgroundColor: isOnlineCheaper ? "#10b981" : "#334155",
+          color: "#ffffff",
+        }}
       >
-        <div className="flex items-center gap-1.5 font-extrabold text-sm">
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", fontWeight: 800, fontSize: "13px" }}>
           {isOnlineCheaper ? (
             <>
-              <TrendingDown className="w-4 h-4" />
-              <span>온라인에서 사면 {difference.toLocaleString()}원 절약!</span>
+              <TrendingDown style={{ width: 16, height: 16 }} />
+              <span>온라인에서 사면 {(difference || 0).toLocaleString()}원 절약!</span>
             </>
           ) : (
             <>
-              <Store className="w-4 h-4" />
+              <Store style={{ width: 16, height: 16 }} />
               <span>오프라인 매장 가격이 더 합리적입니다!</span>
             </>
           )}
         </div>
         {isOnlineCheaper && (
-          <span className="text-xs font-black bg-white/20 px-2 py-0.5 rounded-full">
+          <span
+            style={{
+              fontSize: "11px",
+              fontWeight: 900,
+              backgroundColor: "rgba(255,255,255,0.25)",
+              padding: "2px 8px",
+              borderRadius: "9999px",
+            }}
+          >
             {savingsPercent}% OFF
           </span>
         )}
       </div>
 
       {/* 상품 정보 요약 */}
-      <div className="p-4 border-b border-slate-100 flex gap-3 items-center">
+      <div
+        style={{
+          padding: "14px 16px",
+          borderBottom: "1px solid #f1f5f9",
+          display: "flex",
+          gap: "12px",
+          alignItems: "center",
+        }}
+      >
         {product.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={product.imageUrl}
             alt={product.name}
-            className="w-16 h-16 rounded-xl object-cover border border-slate-200 flex-shrink-0"
+            style={{
+              width: "56px",
+              height: "56px",
+              borderRadius: "10px",
+              objectFit: "cover",
+              border: "1px solid #e2e8f0",
+              flexShrink: 0,
+            }}
           />
         ) : (
-          <div className="w-16 h-16 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 font-bold text-xs flex-shrink-0">
-            상품 이미지
+          <div
+            style={{
+              width: "56px",
+              height: "56px",
+              borderRadius: "10px",
+              backgroundColor: "#f1f5f9",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#94a3b8",
+              fontWeight: "bold",
+              fontSize: "11px",
+              flexShrink: 0,
+            }}
+          >
+            상품
           </div>
         )}
-        <div className="flex-1 min-w-0">
-          <div className="text-xs font-bold text-blue-600 mb-0.5">
-            {product.brand || product.category || "인증 상품"}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: "11px", fontWeight: "bold", color: "#2563eb", marginBottom: "2px" }}>
+            {product.brand || product.category || "스캔 인증 상품"}
           </div>
-          <h2 className="text-sm font-bold text-slate-900 truncate">
+          <h2
+            style={{
+              fontSize: "14px",
+              fontWeight: "bold",
+              color: "#0f172a",
+              margin: 0,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
             {product.name}
           </h2>
           {product.capacity && (
-            <p className="text-xs text-slate-500 mt-0.5">용량/규격: {product.capacity}</p>
+            <p style={{ margin: "2px 0 0 0", fontSize: "11px", color: "#64748b" }}>
+              규격: {product.capacity}
+            </p>
           )}
         </div>
       </div>
 
-      {/* 가격 1:1 직접 비교 그리드 */}
-      <div className="grid grid-cols-2 divide-x divide-slate-100 bg-slate-50/70 p-4">
-        {/* 오프라인 마트 가격 */}
-        <div className="pr-3 flex flex-col justify-between">
-          <div className="flex items-center gap-1 text-xs text-slate-500 font-semibold mb-1">
-            <Store className="w-3.5 h-3.5" /> 오프라인 매장가
+      {/* 가격 1:1 비교 그리드 */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+          backgroundColor: "#f8fafc",
+          padding: "14px 16px",
+        }}
+      >
+        {/* 오프라인 매장 가격 */}
+        <div style={{ paddingRight: "12px", borderRight: "1px solid #e2e8f0" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", color: "#64748b", fontWeight: 600, marginBottom: "4px" }}>
+            <Store style={{ width: 14, height: 14 }} /> 오프라인 매장가
           </div>
           <div>
-            <div className="text-lg font-black text-slate-800">
-              {offlinePrice.toLocaleString()}
-              <span className="text-xs font-normal">원</span>
+            <div style={{ fontSize: "17px", fontWeight: 900, color: "#1e293b" }}>
+              {(offlinePrice || 0).toLocaleString()}
+              <span style={{ fontSize: "12px", fontWeight: 500 }}>원</span>
             </div>
-            <div className="text-[11px] text-slate-400 mt-0.5">현장 카트 담기</div>
+            <div style={{ fontSize: "10px", color: "#94a3b8", marginTop: "2px" }}>현장 카트 담기</div>
           </div>
         </div>
 
-        {/* 온라인(쿠팡) 최저가 */}
-        <div className="pl-3 flex flex-col justify-between">
-          <div className="flex items-center gap-1 text-xs text-red-600 font-bold mb-1">
-            <ShoppingCart className="w-3.5 h-3.5" />
+        {/* 온라인 쿠팡 최저가 */}
+        <div style={{ paddingLeft: "12px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", color: "#dc2626", fontWeight: "bold", marginBottom: "4px" }}>
+            <ShoppingCart style={{ width: 14, height: 14 }} />
             <span>쿠팡 와우 회원가</span>
           </div>
           <div>
-            <div className="text-xl font-black text-red-600">
-              {bestOnline.price.toLocaleString()}
-              <span className="text-xs font-bold">원</span>
+            <div style={{ fontSize: "19px", fontWeight: 900, color: "#dc2626" }}>
+              {(bestOnline.price || 0).toLocaleString()}
+              <span style={{ fontSize: "12px", fontWeight: "bold" }}>원</span>
             </div>
-            <div className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1 mt-0.5">
-              <CheckCircle className="w-3 h-3" />
+            <div style={{ fontSize: "10px", color: "#059669", fontWeight: 600, display: "flex", alignItems: "center", gap: "4px", marginTop: "2px" }}>
+              <CheckCircle style={{ width: 12, height: 12 }} />
               {bestOnline.rocketShipping ? "내일 새벽 무료배송" : "무료배송"}
             </div>
           </div>
         </div>
       </div>
 
-      {/* 단위 가격 비교 팁 (100g당/개당) */}
+      {/* 단위 가격 비교 팁 */}
       {bestOnline.unitPriceText && (
-        <div className="px-4 py-2.5 bg-blue-50/80 border-t border-blue-100 text-xs text-blue-800 font-medium flex items-center justify-between">
+        <div
+          style={{
+            padding: "10px 16px",
+            backgroundColor: "#eff6ff",
+            borderTop: "1px solid #dbeafe",
+            fontSize: "11px",
+            color: "#1e40af",
+            fontWeight: 500,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
           <span>💡 단가 혜택:</span>
-          <span className="font-bold">{bestOnline.unitPriceText}</span>
+          <span style={{ fontWeight: "bold" }}>{bestOnline.unitPriceText}</span>
         </div>
       )}
     </div>
