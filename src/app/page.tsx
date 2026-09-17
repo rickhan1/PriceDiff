@@ -1,11 +1,39 @@
 "use client";
 
 import React, { useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { BarcodeScanner } from "@/components/scanner/BarcodeScanner";
 import { PhotoCapture } from "@/components/scanner/PhotoCapture";
 import { InterstitialAd } from "@/components/ads/InterstitialAd";
-import { Barcode, Camera, Search, Flame, ArrowRight } from "lucide-react";
+import { Barcode, Camera, Search, Flame, ArrowRight, Loader2 } from "lucide-react";
+
+// 클라이언트 전용으로 마운트하여 SSR Hydration 오류 방지
+const BarcodeScanner = dynamic(
+  () => import("@/components/scanner/BarcodeScanner").then((mod) => mod.BarcodeScanner),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "380px",
+          aspectRatio: "4/3",
+          borderRadius: "1rem",
+          backgroundColor: "#0f172a",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "#ffffff",
+          gap: "8px",
+        }}
+      >
+        <Loader2 style={{ width: 28, height: 28, animation: "spin 1s linear infinite" }} />
+        <span style={{ fontSize: "12px", color: "#94a3b8" }}>스캐너 준비 중...</span>
+      </div>
+    ),
+  }
+);
 
 export default function HomePage() {
   const router = useRouter();
@@ -15,7 +43,6 @@ export default function HomePage() {
   const [pendingOfflinePrice, setPendingOfflinePrice] = useState<number | undefined>(undefined);
   const [manualSearchInput, setManualSearchInput] = useState("");
 
-  // 바코드 스캔 완료 처리
   const handleBarcodeSuccess = async (barcode: string) => {
     try {
       const res = await fetch(`/api/barcode?code=${encodeURIComponent(barcode)}`);
@@ -23,7 +50,7 @@ export default function HomePage() {
       if (data.product) {
         setPendingSearchQuery(data.product.name);
         setPendingOfflinePrice(data.product.offlineEstimatePrice);
-        setIsAdOpen(true); // 결과 보기 전 전면 광고 노출
+        setIsAdOpen(true);
       }
     } catch (err) {
       console.error(err);
@@ -32,7 +59,6 @@ export default function HomePage() {
     }
   };
 
-  // 사진 촬영 완료 처리
   const handlePhotoSuccess = (photoData: { detectedName?: string; detectedPrice?: number }) => {
     if (photoData.detectedName) {
       setPendingSearchQuery(photoData.detectedName);
@@ -41,7 +67,6 @@ export default function HomePage() {
     }
   };
 
-  // 직접 검색 처리
   const handleManualSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualSearchInput.trim()) return;
@@ -50,7 +75,6 @@ export default function HomePage() {
     setIsAdOpen(true);
   };
 
-  // 전면 광고 시청 완료 또는 닫기 시 결과 페이지로 이동
   const handleAdComplete = () => {
     setIsAdOpen(false);
     if (pendingSearchQuery) {
@@ -63,43 +87,100 @@ export default function HomePage() {
   };
 
   return (
-    <div className="p-4 flex-1 flex flex-col justify-between">
-      {/* 탭 네비게이션 */}
+    <div
+      className="p-4 flex-1 flex flex-col justify-between"
+      style={{
+        padding: "16px",
+        flex: 1,
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+        width: "100%",
+        maxWidth: "480px",
+        margin: "0 auto",
+        boxSizing: "border-box",
+      }}
+    >
       <div>
-        <div className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-xl mb-4 text-xs font-bold text-slate-600">
+        {/* 상단 3개 탭 */}
+        <div
+          className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-xl mb-4 text-xs font-bold text-slate-600"
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+            gap: "4px",
+            backgroundColor: "#f1f5f9",
+            padding: "4px",
+            borderRadius: "0.75rem",
+            marginBottom: "16px",
+          }}
+        >
           <button
+            type="button"
             onClick={() => setActiveTab("barcode")}
-            className={`py-2 rounded-lg flex items-center justify-center gap-1.5 transition ${
-              activeTab === "barcode"
-                ? "bg-white text-slate-900 shadow-sm"
-                : "hover:text-slate-900"
-            }`}
+            style={{
+              padding: "8px 4px",
+              borderRadius: "0.5rem",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "6px",
+              border: "none",
+              cursor: "pointer",
+              fontSize: "12px",
+              fontWeight: "bold",
+              backgroundColor: activeTab === "barcode" ? "#ffffff" : "transparent",
+              color: activeTab === "barcode" ? "#0f172a" : "#64748b",
+              boxShadow: activeTab === "barcode" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+            }}
           >
-            <Barcode className="w-3.5 h-3.5" /> 바코드 스캔
+            <Barcode style={{ width: 14, height: 14 }} /> 바코드 스캔
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab("photo")}
-            className={`py-2 rounded-lg flex items-center justify-center gap-1.5 transition ${
-              activeTab === "photo"
-                ? "bg-white text-slate-900 shadow-sm"
-                : "hover:text-slate-900"
-            }`}
+            style={{
+              padding: "8px 4px",
+              borderRadius: "0.5rem",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "6px",
+              border: "none",
+              cursor: "pointer",
+              fontSize: "12px",
+              fontWeight: "bold",
+              backgroundColor: activeTab === "photo" ? "#ffffff" : "transparent",
+              color: activeTab === "photo" ? "#0f172a" : "#64748b",
+              boxShadow: activeTab === "photo" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+            }}
           >
-            <Camera className="w-3.5 h-3.5" /> 사진 / 가격표
+            <Camera style={{ width: 14, height: 14 }} /> 사진 / 가격표
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab("search")}
-            className={`py-2 rounded-lg flex items-center justify-center gap-1.5 transition ${
-              activeTab === "search"
-                ? "bg-white text-slate-900 shadow-sm"
-                : "hover:text-slate-900"
-            }`}
+            style={{
+              padding: "8px 4px",
+              borderRadius: "0.5rem",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "6px",
+              border: "none",
+              cursor: "pointer",
+              fontSize: "12px",
+              fontWeight: "bold",
+              backgroundColor: activeTab === "search" ? "#ffffff" : "transparent",
+              color: activeTab === "search" ? "#0f172a" : "#64748b",
+              boxShadow: activeTab === "search" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+            }}
           >
-            <Search className="w-3.5 h-3.5" /> 직접 검색
+            <Search style={{ width: 14, height: 14 }} /> 직접 검색
           </button>
         </div>
 
-        {/* 탭별 본문 */}
+        {/* 탭 내용 */}
         {activeTab === "barcode" && (
           <BarcodeScanner onScanSuccess={handleBarcodeSuccess} />
         )}
@@ -109,29 +190,47 @@ export default function HomePage() {
         )}
 
         {activeTab === "search" && (
-          <div className="w-full max-w-sm mx-auto">
-            <form onSubmit={handleManualSearch} className="relative">
+          <div style={{ width: "100%", maxWidth: "380px", margin: "0 auto" }}>
+            <form onSubmit={handleManualSearch} style={{ position: "relative" }}>
               <input
                 type="text"
                 value={manualSearchInput}
                 onChange={(e) => setManualSearchInput(e.target.value)}
-                placeholder="비교할 상품명을 입력하세요 (예: 삼다수 2L 6병)"
-                className="w-full py-3.5 pl-4 pr-12 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                placeholder="비교할 상품명을 입력하세요"
+                style={{
+                  width: "100%",
+                  padding: "14px 48px 14px 16px",
+                  fontSize: "14px",
+                  backgroundColor: "#f8fafc",
+                  border: "1px solid #cbd5e1",
+                  borderRadius: "0.75rem",
+                  boxSizing: "border-box",
+                }}
               />
               <button
                 type="submit"
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                style={{
+                  position: "absolute",
+                  right: "8px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  padding: "8px",
+                  backgroundColor: "#2563eb",
+                  color: "#ffffff",
+                  borderRadius: "8px",
+                  border: "none",
+                  cursor: "pointer",
+                }}
               >
-                <ArrowRight className="w-4 h-4" />
+                <ArrowRight style={{ width: 16, height: 16 }} />
               </button>
             </form>
 
-            {/* 추천 인기 검색어 */}
-            <div className="mt-4">
-              <span className="text-xs font-bold text-slate-500 flex items-center gap-1 mb-2">
-                <Flame className="w-3.5 h-3.5 text-red-500" /> 오늘 마트에서 가장 많이 비교된 상품:
+            <div style={{ marginTop: "16px" }}>
+              <span style={{ fontSize: "12px", fontWeight: "bold", color: "#64748b", display: "flex", alignItems: "center", gap: "4px", marginBottom: "8px" }}>
+                <Flame style={{ width: 14, height: 14, color: "#ef4444" }} /> 많이 비교된 상품:
               </span>
-              <div className="flex flex-wrap gap-1.5">
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
                 {[
                   "신라면 120g 5개입",
                   "제주 삼다수 2L 6병",
@@ -141,11 +240,21 @@ export default function HomePage() {
                 ].map((item) => (
                   <button
                     key={item}
+                    type="button"
                     onClick={() => {
                       setPendingSearchQuery(item);
                       setIsAdOpen(true);
                     }}
-                    className="text-xs px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg"
+                    style={{
+                      fontSize: "12px",
+                      padding: "6px 12px",
+                      backgroundColor: "#f1f5f9",
+                      color: "#334155",
+                      fontWeight: 500,
+                      borderRadius: "8px",
+                      border: "none",
+                      cursor: "pointer",
+                    }}
                   >
                     {item}
                   </button>
@@ -156,13 +265,24 @@ export default function HomePage() {
         )}
       </div>
 
-      {/* 쇼핑 꿀팁 안내 카드 */}
-      <div className="mt-6 p-4 rounded-2xl bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-200/60 text-xs text-amber-900">
-        <div className="font-extrabold flex items-center gap-1 text-amber-800 mb-1">
+      {/* 스마트 쇼핑 팁 */}
+      <div
+        className="mt-6 p-4 rounded-2xl bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-200/60 text-xs text-amber-900"
+        style={{
+          marginTop: "24px",
+          padding: "16px",
+          borderRadius: "1rem",
+          backgroundColor: "#fffbeb",
+          border: "1px solid #fde68a",
+          fontSize: "12px",
+          color: "#78350f",
+        }}
+      >
+        <div style={{ fontWeight: 800, display: "flex", alignItems: "center", gap: "4px", color: "#92400e", marginBottom: "4px" }}>
           💡 마트 스마트 쇼핑 팁
         </div>
-        <p className="leading-relaxed text-slate-600">
-          코스트코나 트레이더스의 대용량 묶음 상품은 <strong>단위 가격(100g당/개당 가격)</strong>을 꼭 비교해보세요! 부피가 크고 무거운 생수, 쌀, 세제, 기저귀는 쿠팡 로켓배송으로 문 앞까지 무료배송 받는 것이 훨씬 이득입니다.
+        <p style={{ margin: 0, lineHeight: 1.6, color: "#475569" }}>
+          코스트코나 트레이더스의 대용량 묶음 상품은 <strong>단위 가격(100g당/개당 가격)</strong>을 꼭 비교해보세요! 부피가 크고 무거운 생수, 쌀, 세제는 쿠팡 로켓배송으로 문 앞까지 무료배송 받는 것이 훨씬 이득입니다.
         </p>
       </div>
 

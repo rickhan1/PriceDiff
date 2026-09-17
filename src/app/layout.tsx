@@ -40,39 +40,100 @@ export default function RootLayout({
           />
         )}
       </head>
-      <body>
-        <div className="mobile-container">
-          {/* 상단 모바일 앱 네비게이션 헤더 */}
-          <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-100 px-4 py-3 flex items-center justify-between shadow-sm">
-            <a href="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-red-500 to-amber-500 flex items-center justify-center text-white shadow-md shadow-red-500/20">
-                <ShoppingBag className="w-4 h-4" />
+      <body style={{ margin: 0, padding: 0, backgroundColor: "#f3f4f6", fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif" }}>
+        <div
+          className="mobile-container"
+          style={{
+            maxWidth: "480px",
+            margin: "0 auto",
+            minHeight: "100vh",
+            backgroundColor: "#ffffff",
+            boxShadow: "0 0 25px rgba(0,0,0,0.08)",
+            display: "flex",
+            flexDirection: "column",
+            position: "relative",
+            boxSizing: "border-box",
+          }}
+        >
+          {/* 상단 헤더 */}
+          <header
+            style={{
+              position: "sticky",
+              top: 0,
+              zIndex: 40,
+              backgroundColor: "rgba(255, 255, 255, 0.95)",
+              backdropFilter: "blur(8px)",
+              borderBottom: "1px solid #f1f5f9",
+              padding: "12px 16px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <a href="/" style={{ display: "flex", alignItems: "center", gap: "10px", textDecoration: "none" }}>
+              <div
+                style={{
+                  width: "34px",
+                  height: "34px",
+                  borderRadius: "10px",
+                  background: "linear-gradient(135deg, #ef4444, #f59e0b)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#ffffff",
+                  boxShadow: "0 4px 10px rgba(239, 68, 68, 0.3)",
+                }}
+              >
+                <ShoppingBag style={{ width: 18, height: 18 }} />
               </div>
               <div>
-                <div className="flex items-center gap-1">
-                  <span className="font-black text-base tracking-tight text-slate-900">
-                    Price<span className="text-red-600">Diff</span>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span style={{ fontWeight: 900, fontSize: "16px", letterSpacing: "-0.025em", color: "#0f172a" }}>
+                    Price<span style={{ color: "#dc2626" }}>Diff</span>
                   </span>
-                  <span className="px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 text-[10px] font-bold">
+                  <span
+                    style={{
+                      padding: "1px 6px",
+                      borderRadius: "9999px",
+                      backgroundColor: "#fef3c7",
+                      color: "#92400e",
+                      fontSize: "10px",
+                      fontWeight: 800,
+                    }}
+                  >
                     PRO
                   </span>
                 </div>
-                <p className="text-[10px] text-slate-400 -mt-0.5">
+                <p style={{ margin: 0, fontSize: "10px", color: "#94a3b8" }}>
                   코스트코 · 이마트 · 트레이더스 vs 쿠팡
                 </p>
               </div>
             </a>
 
-            <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium bg-slate-100 px-2.5 py-1 rounded-full">
-              <Sparkles className="w-3 h-3 text-amber-500" />
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+                fontSize: "11px",
+                fontWeight: 600,
+                color: "#64748b",
+                backgroundColor: "#f1f5f9",
+                padding: "4px 10px",
+                borderRadius: "9999px",
+              }}
+            >
+              <Sparkles style={{ width: 12, height: 12, color: "#f59e0b" }} />
               <span>실시간 최저가</span>
             </div>
           </header>
 
-          {/* 메인 콘텐츠 영역 */}
-          <main className="flex-1 flex flex-col">{children}</main>
+          {/* 본문 */}
+          <main style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+            {children}
+          </main>
 
-          {/* 하단 고정 배너 광고 */}
+          {/* 하단 광고 배너 */}
           <BannerAd position="bottom" />
         </div>
       </body>
