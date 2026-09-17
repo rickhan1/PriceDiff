@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import "./globals.css";
 import { BannerAd } from "@/components/ads/BannerAd";
+import { DebugOverlay } from "@/components/debug/DebugOverlay";
 import { Sparkles, ShoppingBag } from "lucide-react";
 
 export const metadata: Metadata = {
@@ -135,6 +136,9 @@ export default function RootLayout({
 
           {/* 하단 광고 배너 */}
           <BannerAd position="bottom" />
+
+          {/* 실시간 디버그 로그 오버레이 (모바일 디버깅용) */}
+          <DebugOverlay />
         </div>
       </body>
     </html>

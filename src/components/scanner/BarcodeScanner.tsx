@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { Camera, AlertCircle, RefreshCw, Barcode, CheckCircle2, Upload, ShieldAlert } from "lucide-react";
 import { KNOWN_BARCODES } from "@/lib/barcodeDb";
+import { logger } from "@/lib/logger";
 
 interface BarcodeScannerProps {
   onScanSuccess: (barcode: string) => void;
@@ -29,8 +30,8 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
   const zxingReaderRef = useRef<BrowserMultiFormatReader | null>(null);
   const isScanningActiveRef = useRef(false);
 
-  // 카메라 스트림 및 스캔 중지
   const stopScanner = useCallback(() => {
+    logger.debug("BarcodeScanner", "Stopping camera stream and scan loop");
     isScanningActiveRef.current = false;
     if (scanIntervalRef.current) {
       clearInterval(scanIntervalRef.current);
@@ -47,14 +48,21 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
   }, []);
 
   const handleBarcodeFound = useCallback(
-    (code: string) => {
+    (code: string, method: string) => {
       const trimmed = code.trim();
       if (!trimmed) return;
+
+      logger.info("BarcodeScanner", `Barcode detected successfully via ${method}`, {
+        code: trimmed,
+        knownMatch: Boolean(KNOWN_BARCODES[trimmed]),
+      });
+
       if ("vibrate" in navigator) {
         try {
           navigator.vibrate(100);
         } catch (e) {}
       }
+
       setLastScannedCode(trimmed);
       stopScanner();
       onScanSuccess(trimmed);
@@ -62,14 +70,14 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
     [onScanSuccess, stopScanner]
   );
 
-  // 카메라 시작
   const startCamera = useCallback(async () => {
     try {
+      logger.info("BarcodeScanner", "Requesting camera permissions...");
       setErrorMsg(null);
       stopScanner();
 
       if (!navigator?.mediaDevices?.getUserMedia) {
-        throw new Error("브라우저 보안상 카메라를 켤 수 없습니다. (HTTPS 필요)");
+        throw new Error("브라우저에서 카메라 API를 지원하지 않습니다. (HTTPS 환경 필요)");
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -82,20 +90,28 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
       });
 
       streamRef.current = stream;
+      logger.info("BarcodeScanner", "Camera stream obtained successfully", {
+        tracks: stream.getVideoTracks().map((t) => ({ label: t.label, readyState: t.readyState })),
+      });
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.setAttribute("playsinline", "true");
         videoRef.current.setAttribute("muted", "true");
         await videoRef.current.play();
+
         setIsScanning(true);
         isScanningActiveRef.current = true;
+        logger.info("BarcodeScanner", "Video playing, initializing scan loop");
 
-        // 안정적인 250ms 간격 스캔 루프 (과부하 방지)
         initScanningLoop();
       }
     } catch (err: any) {
-      console.warn("Camera failed:", err);
+      logger.error("BarcodeScanner", "Failed to start camera", {
+        name: err?.name,
+        message: err?.message,
+      });
+
       setErrorMsg(
         err?.name === "NotAllowedError"
           ? "카메라 접근 권한이 거부되었습니다. 브라우저 주소창 왼쪽의 자물쇠/설정 아이콘을 눌러 권한을 허용해주세요."
@@ -105,18 +121,19 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
     }
   }, [onError, stopScanner]);
 
-  // 안전한 스캔 루프 (초당 4회, 오프스크린 캔버스 이용으로 DOM 변경 제로)
   const initScanningLoop = () => {
     if (scanIntervalRef.current) clearInterval(scanIntervalRef.current);
 
-    // 네이티브 BarcodeDetector 준비
     let nativeDetector: any = null;
-    if (typeof window !== "undefined" && "BarcodeDetector" in window) {
+    const hasNative = typeof window !== "undefined" && "BarcodeDetector" in window;
+
+    if (hasNative) {
       try {
         // @ts-ignore
         nativeDetector = new window.BarcodeDetector({
           formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "qr_code"],
         });
+        logger.info("BarcodeScanner", "Native BarcodeDetector enabled");
       } catch (e) {
         nativeDetector = null;
       }
@@ -132,16 +149,14 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
       if (video.readyState < 2 || video.videoWidth === 0) return;
 
       try {
-        // 1순위: 네이티브 하드웨어 가속 BarcodeDetector
         if (nativeDetector) {
           const barcodes = await nativeDetector.detect(video);
           if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
-            handleBarcodeFound(barcodes[0].rawValue);
+            handleBarcodeFound(barcodes[0].rawValue, "Native BarcodeDetector");
             return;
           }
         }
 
-        // 2순위: 캔버스 캡처 후 ZXing 디코딩 (DOM 변경 완전 차단)
         const canvas = canvasRef.current;
         if (canvas) {
           const ctx = canvas.getContext("2d", { willReadFrequently: true });
@@ -154,24 +169,28 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
             if (zxingReaderRef.current) {
               const result = await zxingReaderRef.current.decodeFromImageUrl(imgUrl);
               if (result && result.getText()) {
-                handleBarcodeFound(result.getText());
+                handleBarcodeFound(result.getText(), "ZXing Canvas Decoder");
                 return;
               }
             }
           }
         }
       } catch (err) {
-        // 미감지 시 조용히 다음 틱 대기
+        // 미감지 무시
       }
     }, 250);
   };
 
-  // 사진 촬영 또는 파일 업로드에서 바코드 추출
   const handleBarcodeImageFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     try {
+      logger.info("BarcodeScanner", "Processing barcode from uploaded image/photo", {
+        fileName: file.name,
+        size: file.size,
+      });
+
       setIsProcessingFile(true);
       setErrorMsg(null);
       stopScanner();
@@ -184,12 +203,12 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
       const result = await zxingReaderRef.current.decodeFromImageUrl(imageUrl);
 
       if (result && result.getText()) {
-        handleBarcodeFound(result.getText());
+        handleBarcodeFound(result.getText(), "ZXing Image Upload");
       } else {
         throw new Error("바코드를 찾을 수 없습니다.");
       }
     } catch (err: any) {
-      console.warn("File decode error:", err);
+      logger.warn("BarcodeScanner", "Failed to decode barcode from image file", { error: err?.message });
       setErrorMsg("사진에서 바코드를 인식하지 못했습니다. 더 선명한 바코드 사진으로 다시 시도해주세요.");
     } finally {
       setIsProcessingFile(false);
@@ -206,10 +225,8 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
 
   return (
     <div className="flex flex-col items-center w-full" style={{ width: "100%", position: "relative" }}>
-      {/* 내부 처리용 숨김 캔버스 */}
       <canvas ref={canvasRef} style={{ display: "none" }} />
 
-      {/* 숨김 파일 인풋 */}
       <input
         ref={fileInputRef}
         type="file"
@@ -226,9 +243,7 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
         onChange={handleBarcodeImageFile}
       />
 
-      {/* 모바일 카메라 뷰포트 (인라인 스타일로 CSS 해제 방어) */}
       <div
-        className="relative w-full aspect-[4/3] max-w-sm rounded-2xl overflow-hidden bg-slate-950 border-2 border-slate-700 shadow-xl flex items-center justify-center"
         style={{
           width: "100%",
           maxWidth: "380px",
@@ -240,7 +255,6 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
           boxShadow: "0 10px 25px -5px rgba(0,0,0,0.3)",
         }}
       >
-        {/* 순수 비디오 태그 */}
         <video
           ref={videoRef}
           playsInline
@@ -255,10 +269,8 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
           }}
         />
 
-        {/* 조준선 레이저 가이드 오버레이 */}
         {isScanning && !errorMsg && (
           <div
-            className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center"
             style={{
               position: "absolute",
               inset: 0,
@@ -270,7 +282,6 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
             }}
           >
             <div
-              className="w-60 h-32 border-2 border-red-500 rounded-xl relative shadow-lg shadow-red-500/30"
               style={{
                 width: "240px",
                 height: "130px",
@@ -279,7 +290,6 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
                 position: "relative",
               }}
             >
-              {/* 빨간 레이저 선 */}
               <div
                 style={{
                   position: "absolute",
@@ -309,7 +319,6 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
           </div>
         )}
 
-        {/* 오류 또는 권한 거부 안내 화면 */}
         {errorMsg && (
           <div
             style={{
@@ -325,7 +334,7 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
               zIndex: 20,
             }}
           >
-            <ShieldAlert className="w-9 h-9 text-amber-400 mb-2" style={{ color: "#fbbf24", width: 36, height: 36, marginBottom: 8 }} />
+            <ShieldAlert style={{ color: "#fbbf24", width: 36, height: 36, marginBottom: 8 }} />
             <h4 style={{ color: "#ffffff", fontSize: "14px", fontWeight: "bold", marginBottom: "4px" }}>
               카메라 안내
             </h4>
@@ -383,7 +392,6 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
         )}
       </div>
 
-      {/* 카메라가 켜져 있을 때 보조 툴바 */}
       {isScanning && !errorMsg && (
         <div
           style={{
@@ -420,7 +428,6 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
         </div>
       )}
 
-      {/* 인식된 바코드 피드백 */}
       {lastScannedCode && (
         <div
           style={{
@@ -441,9 +448,7 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
         </div>
       )}
 
-      {/* 빠른 테스트 상품 샘플 */}
       <div
-        className="w-full mt-4 p-3.5 bg-slate-50 rounded-2xl border border-slate-200"
         style={{
           width: "100%",
           maxWidth: "380px",

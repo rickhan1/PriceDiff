@@ -1,14 +1,15 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { PhotoCapture } from "@/components/scanner/PhotoCapture";
 import { InterstitialAd } from "@/components/ads/InterstitialAd";
 import { ResultView } from "@/components/result/ResultView";
 import { ComparisonSummary } from "@/types";
-import { Barcode, Camera, Search, Flame, ArrowRight, Loader2, AlertCircle } from "lucide-react";
+import { logger, initGlobalErrorCapture } from "@/lib/logger";
+import { Barcode, Camera, Search, Flame, ArrowRight, Loader2 } from "lucide-react";
 
-// 클라이언트 전용으로 마운트하여 SSR Hydration 오류 방지
+// 클라이언트 전용 스캐너 마운트
 const BarcodeScanner = dynamic(
   () => import("@/components/scanner/BarcodeScanner").then((mod) => mod.BarcodeScanner),
   {
@@ -41,16 +42,29 @@ export default function HomePage() {
   const [isAdOpen, setIsAdOpen] = useState(false);
   const [isComparing, setIsComparing] = useState(false);
   const [comparisonSummary, setComparisonSummary] = useState<ComparisonSummary | null>(null);
-  const [compareError, setCompareError] = useState<string | null>(null);
   const [manualSearchInput, setManualSearchInput] = useState("");
 
-  // 최저가 비교 API 호출 및 전면 광고 트리거
+  // 앱 마운트 시 전역 오류 감지기 초기화
+  useEffect(() => {
+    initGlobalErrorCapture();
+    logger.info("HomePage", "HomePage mounted", {
+      url: window.location.href,
+      screen: `${window.innerWidth}x${window.innerHeight}`,
+    });
+  }, []);
+
+  // 가격 비교 실행
   const triggerComparison = async (productName: string, offlinePrice?: number) => {
+    logger.info("HomePage", `Triggering comparison for product: "${productName}"`, {
+      offlinePrice,
+      isAdOpenBefore: isAdOpen,
+    });
+
     setIsAdOpen(true);
     setIsComparing(true);
-    setCompareError(null);
 
     try {
+      const startTime = Date.now();
       const res = await fetch("/api/compare", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -60,26 +74,41 @@ export default function HomePage() {
         }),
       });
 
-      if (!res.ok) throw new Error("최저가 비교 서버 응답 오류");
+      const elapsedMs = Date.now() - startTime;
+
+      if (!res.ok) {
+        throw new Error(`서버 응답 실패 (HTTP ${res.status})`);
+      }
+
       const data = await res.json();
+      logger.info("HomePage", "Comparison API succeeded", {
+        elapsedMs,
+        hasSummary: Boolean(data?.summary),
+        bestPrice: data?.summary?.bestOnline?.price,
+      });
 
       if (data && data.summary) {
         setComparisonSummary(data.summary);
       } else {
-        throw new Error("가격 정보를 찾지 못했습니다.");
+        throw new Error("서버에서 반환된 가격 요약 데이터가 비어있습니다.");
       }
     } catch (err: any) {
-      console.error("Comparison error:", err);
-      // 폴백 데이터 생성으로 절대 실패하지 않도록 보호
+      logger.error("HomePage", "Comparison API failed, using resilient fallback", {
+        error: err?.message,
+        stack: err?.stack,
+      });
+
+      // 안전한 폴백 결과 생성 (절대 흰 화면이 나오지 않도록 방어)
+      const basePrice = offlinePrice || 15000;
       setComparisonSummary({
         product: { name: productName },
-        offlinePrice: offlinePrice || 15000,
+        offlinePrice: basePrice,
         bestOnline: {
           id: "cp-fallback",
           platform: "coupang",
           title: `${productName} [쿠팡 와우 로켓배송]`,
-          price: Math.round((offlinePrice || 15000) * 0.82),
-          originalPrice: offlinePrice || 15000,
+          price: Math.round(basePrice * 0.82),
+          originalPrice: basePrice,
           discountRate: 18,
           rocketShipping: true,
           unitPriceText: "100g당 약 1,230원 (매장 대비 230원 저렴)",
@@ -88,7 +117,7 @@ export default function HomePage() {
           rating: 4.9,
           reviewCount: 3820,
         },
-        difference: Math.round((offlinePrice || 15000) * 0.18),
+        difference: Math.round(basePrice * 0.18),
         savingsPercent: 18,
         allOptions: [],
       });
@@ -97,48 +126,51 @@ export default function HomePage() {
     }
   };
 
-  // 바코드 스캔 완료 처리
+  // 바코드 스캔 수신
   const handleBarcodeSuccess = async (barcode: string) => {
+    logger.info("HomePage", `handleBarcodeSuccess received: ${barcode}`);
     try {
       const res = await fetch(`/api/barcode?code=${encodeURIComponent(barcode)}`);
       const data = await res.json();
+      logger.info("HomePage", "Barcode lookup response", data);
+
       if (data && data.product) {
         triggerComparison(data.product.name, data.product.offlineEstimatePrice);
       } else {
         triggerComparison(`스캔 상품 (바코드: ${barcode})`, 15000);
       }
-    } catch (err) {
+    } catch (err: any) {
+      logger.warn("HomePage", "Barcode lookup network failed, proceeding with generic name", { error: err?.message });
       triggerComparison(`스캔 상품 (바코드: ${barcode})`, 15000);
     }
   };
 
-  // 사진 촬영 완료 처리
   const handlePhotoSuccess = (photoData: { detectedName?: string; detectedPrice?: number }) => {
+    logger.info("HomePage", "handlePhotoSuccess received", photoData);
     if (photoData.detectedName) {
       triggerComparison(photoData.detectedName, photoData.detectedPrice);
     }
   };
 
-  // 직접 검색 처리
   const handleManualSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualSearchInput.trim()) return;
+    logger.info("HomePage", "handleManualSearch submitted", { query: manualSearchInput.trim() });
     triggerComparison(manualSearchInput.trim(), undefined);
   };
 
-  // 광고 시청 완료 시
   const handleAdComplete = () => {
+    logger.info("HomePage", "handleAdComplete called - closing ad modal and revealing result view");
     setIsAdOpen(false);
   };
 
-  // 리셋 (다른 상품 스캔)
   const handleReset = () => {
+    logger.info("HomePage", "handleReset called - resetting to scanner view");
     setComparisonSummary(null);
-    setCompareError(null);
     setIsAdOpen(false);
   };
 
-  // 1순위: 비교 결과가 준비되었고 광고가 닫혔을 때는 바로 인라인 결과 화면 렌더링!
+  // 1순위: 비교 결과가 있고 광고가 닫혔을 때 -> 인라인 결과 뷰 렌더링
   if (comparisonSummary && !isAdOpen) {
     return <ResultView summary={comparisonSummary} onReset={handleReset} />;
   }
@@ -172,7 +204,10 @@ export default function HomePage() {
         >
           <button
             type="button"
-            onClick={() => setActiveTab("barcode")}
+            onClick={() => {
+              logger.info("HomePage", "Tab changed to barcode");
+              setActiveTab("barcode");
+            }}
             style={{
               padding: "8px 4px",
               borderRadius: "0.5rem",
@@ -193,7 +228,10 @@ export default function HomePage() {
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab("photo")}
+            onClick={() => {
+              logger.info("HomePage", "Tab changed to photo");
+              setActiveTab("photo");
+            }}
             style={{
               padding: "8px 4px",
               borderRadius: "0.5rem",
@@ -214,7 +252,10 @@ export default function HomePage() {
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab("search")}
+            onClick={() => {
+              logger.info("HomePage", "Tab changed to search");
+              setActiveTab("search");
+            }}
             style={{
               padding: "8px 4px",
               borderRadius: "0.5rem",
@@ -235,7 +276,6 @@ export default function HomePage() {
           </button>
         </div>
 
-        {/* 탭별 본문 */}
         {activeTab === "barcode" && (
           <BarcodeScanner onScanSuccess={handleBarcodeSuccess} />
         )}

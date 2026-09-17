@@ -1,10 +1,11 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { ComparisonSummary } from "@/types";
 import { PriceCard } from "@/components/result/PriceCard";
 import { AffiliatedButton } from "@/components/result/AffiliatedButton";
 import { BannerAd } from "@/components/ads/BannerAd";
+import { logger } from "@/lib/logger";
 import { ArrowLeft, RotateCcw, CheckCircle2 } from "lucide-react";
 
 interface ResultViewProps {
@@ -13,6 +14,16 @@ interface ResultViewProps {
 }
 
 export const ResultView: React.FC<ResultViewProps> = ({ summary, onReset }) => {
+  useEffect(() => {
+    logger.info("ResultView", "ResultView rendered successfully", {
+      productName: summary?.product?.name,
+      offlinePrice: summary?.offlinePrice,
+      bestOnlinePrice: summary?.bestOnline?.price,
+      difference: summary?.difference,
+      savingsPercent: summary?.savingsPercent,
+    });
+  }, [summary]);
+
   return (
     <div
       style={{
@@ -34,7 +45,10 @@ export const ResultView: React.FC<ResultViewProps> = ({ summary, onReset }) => {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <button
             type="button"
-            onClick={onReset}
+            onClick={() => {
+              logger.info("ResultView", "User clicked back to scanner button");
+              onReset();
+            }}
             style={{
               display: "flex",
               alignItems: "center",
@@ -84,7 +98,10 @@ export const ResultView: React.FC<ResultViewProps> = ({ summary, onReset }) => {
       <div style={{ textAlign: "center", paddingTop: "8px", paddingBottom: "16px" }}>
         <button
           type="button"
-          onClick={onReset}
+          onClick={() => {
+            logger.info("ResultView", "User clicked bottom reset button");
+            onReset();
+          }}
           style={{
             display: "inline-flex",
             alignItems: "center",
