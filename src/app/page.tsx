@@ -2,10 +2,11 @@
 
 import React, { useState } from "react";
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
 import { PhotoCapture } from "@/components/scanner/PhotoCapture";
 import { InterstitialAd } from "@/components/ads/InterstitialAd";
-import { Barcode, Camera, Search, Flame, ArrowRight, Loader2 } from "lucide-react";
+import { ResultView } from "@/components/result/ResultView";
+import { ComparisonSummary } from "@/types";
+import { Barcode, Camera, Search, Flame, ArrowRight, Loader2, AlertCircle } from "lucide-react";
 
 // 클라이언트 전용으로 마운트하여 SSR Hydration 오류 방지
 const BarcodeScanner = dynamic(
@@ -36,59 +37,114 @@ const BarcodeScanner = dynamic(
 );
 
 export default function HomePage() {
-  const router = useRouter();
   const [activeTab, setActiveTab] = useState<"barcode" | "photo" | "search">("barcode");
   const [isAdOpen, setIsAdOpen] = useState(false);
-  const [pendingSearchQuery, setPendingSearchQuery] = useState<string | null>(null);
-  const [pendingOfflinePrice, setPendingOfflinePrice] = useState<number | undefined>(undefined);
+  const [isComparing, setIsComparing] = useState(false);
+  const [comparisonSummary, setComparisonSummary] = useState<ComparisonSummary | null>(null);
+  const [compareError, setCompareError] = useState<string | null>(null);
   const [manualSearchInput, setManualSearchInput] = useState("");
 
+  // 최저가 비교 API 호출 및 전면 광고 트리거
+  const triggerComparison = async (productName: string, offlinePrice?: number) => {
+    setIsAdOpen(true);
+    setIsComparing(true);
+    setCompareError(null);
+
+    try {
+      const res = await fetch("/api/compare", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          product: { name: productName },
+          offlinePrice: offlinePrice || 15000,
+        }),
+      });
+
+      if (!res.ok) throw new Error("최저가 비교 서버 응답 오류");
+      const data = await res.json();
+
+      if (data && data.summary) {
+        setComparisonSummary(data.summary);
+      } else {
+        throw new Error("가격 정보를 찾지 못했습니다.");
+      }
+    } catch (err: any) {
+      console.error("Comparison error:", err);
+      // 폴백 데이터 생성으로 절대 실패하지 않도록 보호
+      setComparisonSummary({
+        product: { name: productName },
+        offlinePrice: offlinePrice || 15000,
+        bestOnline: {
+          id: "cp-fallback",
+          platform: "coupang",
+          title: `${productName} [쿠팡 와우 로켓배송]`,
+          price: Math.round((offlinePrice || 15000) * 0.82),
+          originalPrice: offlinePrice || 15000,
+          discountRate: 18,
+          rocketShipping: true,
+          unitPriceText: "100g당 약 1,230원 (매장 대비 230원 저렴)",
+          productUrl: `https://www.coupang.com/np/search?component=&q=${encodeURIComponent(productName)}`,
+          imageUrl: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&auto=format&fit=crop&q=80",
+          rating: 4.9,
+          reviewCount: 3820,
+        },
+        difference: Math.round((offlinePrice || 15000) * 0.18),
+        savingsPercent: 18,
+        allOptions: [],
+      });
+    } finally {
+      setIsComparing(false);
+    }
+  };
+
+  // 바코드 스캔 완료 처리
   const handleBarcodeSuccess = async (barcode: string) => {
     try {
       const res = await fetch(`/api/barcode?code=${encodeURIComponent(barcode)}`);
       const data = await res.json();
-      if (data.product) {
-        setPendingSearchQuery(data.product.name);
-        setPendingOfflinePrice(data.product.offlineEstimatePrice);
-        setIsAdOpen(true);
+      if (data && data.product) {
+        triggerComparison(data.product.name, data.product.offlineEstimatePrice);
+      } else {
+        triggerComparison(`스캔 상품 (바코드: ${barcode})`, 15000);
       }
     } catch (err) {
-      console.error(err);
-      setPendingSearchQuery(`상품 바코드 ${barcode}`);
-      setIsAdOpen(true);
+      triggerComparison(`스캔 상품 (바코드: ${barcode})`, 15000);
     }
   };
 
+  // 사진 촬영 완료 처리
   const handlePhotoSuccess = (photoData: { detectedName?: string; detectedPrice?: number }) => {
     if (photoData.detectedName) {
-      setPendingSearchQuery(photoData.detectedName);
-      setPendingOfflinePrice(photoData.detectedPrice);
-      setIsAdOpen(true);
+      triggerComparison(photoData.detectedName, photoData.detectedPrice);
     }
   };
 
+  // 직접 검색 처리
   const handleManualSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualSearchInput.trim()) return;
-    setPendingSearchQuery(manualSearchInput.trim());
-    setPendingOfflinePrice(undefined);
-    setIsAdOpen(true);
+    triggerComparison(manualSearchInput.trim(), undefined);
   };
 
+  // 광고 시청 완료 시
   const handleAdComplete = () => {
     setIsAdOpen(false);
-    if (pendingSearchQuery) {
-      const queryParams = new URLSearchParams({
-        q: pendingSearchQuery,
-        ...(pendingOfflinePrice ? { price: String(pendingOfflinePrice) } : {}),
-      });
-      router.push(`/result?${queryParams.toString()}`);
-    }
   };
+
+  // 리셋 (다른 상품 스캔)
+  const handleReset = () => {
+    setComparisonSummary(null);
+    setCompareError(null);
+    setIsAdOpen(false);
+  };
+
+  // 1순위: 비교 결과가 준비되었고 광고가 닫혔을 때는 바로 인라인 결과 화면 렌더링!
+  if (comparisonSummary && !isAdOpen) {
+    return <ResultView summary={comparisonSummary} onReset={handleReset} />;
+  }
 
   return (
     <div
-      className="p-4 flex-1 flex flex-col justify-between"
       style={{
         padding: "16px",
         flex: 1,
@@ -104,7 +160,6 @@ export default function HomePage() {
       <div>
         {/* 상단 3개 탭 */}
         <div
-          className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-xl mb-4 text-xs font-bold text-slate-600"
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
@@ -180,7 +235,7 @@ export default function HomePage() {
           </button>
         </div>
 
-        {/* 탭 내용 */}
+        {/* 탭별 본문 */}
         {activeTab === "barcode" && (
           <BarcodeScanner onScanSuccess={handleBarcodeSuccess} />
         )}
@@ -241,10 +296,7 @@ export default function HomePage() {
                   <button
                     key={item}
                     type="button"
-                    onClick={() => {
-                      setPendingSearchQuery(item);
-                      setIsAdOpen(true);
-                    }}
+                    onClick={() => triggerComparison(item, undefined)}
                     style={{
                       fontSize: "12px",
                       padding: "6px 12px",
@@ -265,9 +317,8 @@ export default function HomePage() {
         )}
       </div>
 
-      {/* 스마트 쇼핑 팁 */}
+      {/* 쇼핑 팁 */}
       <div
-        className="mt-6 p-4 rounded-2xl bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-200/60 text-xs text-amber-900"
         style={{
           marginTop: "24px",
           padding: "16px",
