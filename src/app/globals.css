@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 17, 24, 39;
+  --background-start-rgb: 249, 250, 251;
+  --background-end-rgb: 243, 244, 246;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: #f3f4f6;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+/* 모바일 앱 뷰포트 컨테이너 */
+.mobile-container {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background: #ffffff;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* 스캐너 카메라 뷰 커스텀 스타일 */
+#reader {
+  border: none !important;
+  width: 100% !important;
+  border-radius: 1rem;
+  overflow: hidden;
+}
+
+#reader video {
+  border-radius: 1rem;
+  object-fit: cover;
+  width: 100% !important;
+}
+
+#reader __dashboard_section_csr {
+  display: none !important;
+}

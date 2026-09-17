@@ -1,0 +1,16 @@
+{
+  "name": "프라이스디프 - 마트 vs 쿠팡 최저가 비교",
+  "short_name": "PriceDiff",
+  "description": "코스트코, 이마트, 트레이더스에서 바코드/사진을 찍어 쿠팡 최저가와 실시간 비교",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#E61E2B",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ]
+}
